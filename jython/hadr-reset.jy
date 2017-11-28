@@ -1,0 +1,180 @@
+#usage:
+#./wsadmin.sh -lang jython -conntype none \
+# -wsadmin_classpath ${db2jccjar} \
+# -javaoption -Ddb2.jcc.outputDirectory=/tmp/$(date +%s) \
+# -f hadr-reset.jy
+
+from java.io import *
+from java.lang import *
+from javax.xml.parsers import *
+from org.w3c.dom import *
+from com.ibm.db2.jcc import *
+from com.ibm.db2.jcc.t4 import *
+from com.ibm.ISecurityUtilityImpl.PasswordUtil import *
+
+import os,sys
+
+execname='hadr-rest.jy'
+db2jccoutputdirectory='${WAS_INSTALL_ROOT}/bin/'
+printwriter=PrintWriter(BufferedWriter(FileWriter(System.getProperty("db2.jcc.outputDirectory")+'/jccServerListCache.log', 1)))
+
+environs={}
+jccserverlistcachebinreset={}
+jccserverlistcachebinloaded={}
+serverlistcache=ServerListCache()
+
+def jccserverlistcachebinload(jccserverlistcachebinfile):
+	if not os.path.isfile(jccserverlistcachebinfile):
+		print execname+':File '+jccserverlistcachebinfile+' not exist ...'
+		return
+	if jccserverlistcachebinloaded.has_key(os.path.abspath(jccserverlistcachebinfile)):
+		print execname+':File '+jccserverlistcachebinfile+' is loaded ...'
+		return
+	readobject=ObjectInputStream(FileInputStream(jccserverlistcachebinfile)).readObject()
+	if readobject:
+		serverlistcacheloaded=readobject.getCache()
+		printwriter.println('['+jccserverlistcachebinfile+']')
+		for key in serverlistcacheloaded.keySet():
+			serverlistentry=serverlistcacheloaded.get(key)
+			servername=serverlistentry.getServerName()
+			portnumber=serverlistentry.getPortNumber()
+			lastupdatedtime=serverlistentry.getLastUpdatedTime()
+			serverlistcache.updateEntryWithLatestServerList(key,servername,portnumber,lastupdatedtime)
+			printwriter.println(key+':'+str(servername)+','+str(portnumber)+','+str(lastupdatedtime))
+		print execname+':File '+jccserverlistcachebinfile+' Loaded to ServerListCache('+str(serverlistcacheloaded.size())+'/'+str(serverlistcache.getCache().size())+') ...' 
+	jccserverlistcachebinloaded[os.path.abspath(jccserverlistcachebinfile)]=1
+
+def getvariablesubstitutionentrys(containmentpath):
+	variablesubstitutionentrys={}
+	variablemapid=AdminConfig.getid(containmentpath)
+	if not variablemapid:
+		return {}
+	for variablesubstitutionentry in AdminConfig.list('VariableSubstitutionEntry',variablemapid).split('\n'):
+		variablesubstitutionentrys[AdminConfig.showAttribute(variablesubstitutionentry,'symbolicName')]=AdminConfig.showAttribute(variablesubstitutionentry,'value')
+	return variablesubstitutionentrys
+
+def getserverinfo():
+	variables={}
+	for cell in AdminConfig.list('Cell').split('\n'):
+		cellname=AdminConfig.showAttribute(cell,'name')
+		variables[cellname]=getvariablesubstitutionentrys('/Cell:'+cellname+'/VariableMap:/')
+		for node in AdminConfig.list('Node',cell).split('\n'):
+			nodename=AdminConfig.showAttribute(node,'name')
+			variables[nodename]=getvariablesubstitutionentrys('/Cell:'+cellname+'/Node:'+nodename+'/VariableMap:/')
+			for server in AdminConfig.list('Server',node).split('\n'):
+				servername=AdminConfig.showAttribute(server,'name')
+				variables[servername]=getvariablesubstitutionentrys('/Cell:'+cellname+'/Node:'+nodename+'/Server:'+servername+'/VariableMap:/')
+				environs[server]=[variables[cellname],variables[nodename],variables[servername]]
+
+def expandvariable(var,server):
+	if not os.path.isabs(var):
+		_environ=str(os.environ)
+		if not environs:
+			getserverinfo()
+		if environs.has_key(server):
+			for variable in environs[server]:
+				for variablekey in variable.keys():
+					os.environ[variablekey]=variable[variablekey]
+		while(not os.path.isabs(var) and os.path.expandvars(var)!=var):
+			var=os.path.expandvars(var)
+		os.environ.clear()
+		os.environ.update(eval(_environ))
+	return var
+
+#create ServerListCache from exist DataSource
+documentbuilderfactory=DocumentBuilderFactory.newInstance()
+documentbuilder=documentbuilderfactory.newDocumentBuilder()
+document=documentbuilder.parse(File(os.environ['CONFIG_ROOT']+'/cells/'+os.environ['WAS_CELL']+'/security.xml'))
+authdataentries=document.getElementsByTagName('authDataEntries')
+authdata={}
+for i in range(authdataentries.getLength()):
+	authdata[authdataentries.item(i).getAttribute('alias')]=(authdataentries.item(i).getAttribute('userId'),passwordDecode(authdataentries.item(i).getAttribute('password')))
+
+for i in AdminConfig.list('DataSource').split('\n'):
+	n=AdminConfig.showAttribute(i,'name')
+
+	provider=AdminConfig.showAttribute(i,'provider')
+	if not provider:
+		continue
+	if AdminConfig.showAttribute(provider,'implementationClassName') not in ['com.ibm.db2.jcc.DB2XADataSource','com.ibm.db2.jcc.DB2ConnectionPoolDataSource']:
+		continue
+
+	propertyset=AdminConfig.showAttribute(i,'propertySet')
+	if not propertyset:
+		continue
+	authdataalias=AdminConfig.showAttribute(i,'authDataAlias')
+	mapping=AdminConfig.showAttribute(i,'mapping')
+	if not authdataalias and mapping:
+		authdataalias=AdminConfig.showAttribute(mapping,'authDataAlias')
+	if not authdataalias:
+		continue
+
+	db2simpledatasource=DB2SimpleDataSource()
+	db2simpledatasource.setDriverType(4)
+	datasourceproperty={}
+	for p in AdminConfig.list('J2EEResourceProperty',propertyset).split('\n'):
+		name=AdminConfig.showAttribute(p,'name')
+		value=AdminConfig.showAttribute(p,'value')
+		if name in ['portNumber','databaseName','serverName']:
+			datasourceproperty[name]=value
+		if name in ['clientRerouteAlternatePortNumber','clientRerouteAlternateServerName','maxRetriesForClientReroute','retryIntervalForClientReroute']:
+			print execname+':Reset exist J2EEResourceProperty:'+name+'('+value+') on DataSource:'+n+' ...'
+			AdminConfig.modify(p,'[[value ""]]')
+	db2simpledatasource.setPortNumber(int(datasourceproperty['portNumber']))
+	db2simpledatasource.setDatabaseName(datasourceproperty['databaseName'])
+	db2simpledatasource.setServerName(datasourceproperty['serverName'])
+	try:
+		db2simpledatasource.getConnection(authdata[authdataalias][0],authdata[authdataalias][1])
+	except:
+		print execname+':DataSource '+n+' getConnection failed ...'
+		continue
+	clientrerouteserverlist=db2simpledatasource.getClientRerouteServerList()
+	if not clientrerouteserverlist:
+		continue
+	serverlistentrykey=datasourceproperty['serverName']+':'+datasourceproperty['portNumber']
+	serverlistentryupdatedtime=System.currentTimeMillis()
+	alternateservername=clientrerouteserverlist.getAlternateServerName()
+	alternateportnumber=clientrerouteserverlist.getAlternatePortNumber()
+	if alternateservername: 
+		printwriter.println('[DataSource:'+n+']\n'+serverlistentrykey+':'+str(alternateservername)+','+str(alternateportnumber)+','+str(serverlistentryupdatedtime))
+		serverlistcache.updateEntryWithLatestServerList(serverlistentrykey,alternateservername,alternateportnumber,serverlistentryupdatedtime)
+
+#load runtime ServerListCache
+if os.environ.has_key('jccserverlistcachebin'):
+	for i in os.environ['jccserverlistcachebin'].split(':'):
+		if i:
+			jccserverlistcachebinload(i)
+
+#load was-jvm setting ServerListCache & reset Property:db2.jcc.outputDirectory
+for i in AdminConfig.list('Server').split('\n'):
+	reset=0
+	if AdminConfig.showAttribute(i,'serverType') in ('APPLICATION_SERVER','DEPLOYMENT_MANAGER','NODE_AGENT'):
+		n=AdminConfig.showAttribute(i,'name')
+		j=AdminConfig.list('JavaVirtualMachine',i)
+		for p in AdminConfig.list('Property',j).split('\n'):
+			if AdminConfig.showAttribute(p,'name')=='db2.jcc.outputDirectory':
+				outputdirectory=AdminConfig.showAttribute(p,'value')
+				outputdirectory=expandvariable(outputdirectory,i)
+				jccserverlistcachebinload(outputdirectory+'/jccServerListCache.bin')
+				print execname+':Update exist Property:'+AdminConfig.showAttribute(p,'name')+'('+AdminConfig.showAttribute(p,'value')+') on Server:'+n+' ...'
+				AdminConfig.modify(p,'[[value '+db2jccoutputdirectory+']]')
+				reset=1
+		if not reset:
+			jccserverlistcachebinload(System.getProperty("java.io.tmpdir")+'/jccServerListCache.bin')
+			p=AdminConfig.create('Property',j,'[[validationExpression ""][name "db2.jcc.outputDirectory"][description ""][value '+db2jccoutputdirectory+'][required "false"]]')
+			print 'Create new Property:'+AdminConfig.showAttribute(p,'name')+'('+AdminConfig.showAttribute(p,'value')+') on Server:'+n
+			print 'Create new Property on Server:'+n
+		jccserverlistcachebinreset[os.path.abspath(expandvariable(db2jccoutputdirectory,i))]=1
+
+AdminConfig.save()
+printwriter.close()
+
+if serverlistcache.getCache():
+	for path in jccserverlistcachebinreset.keys():
+		objectoutputstream=ObjectOutputStream(FileOutputStream(path+'/jccServerListCache.bin'))
+		try:
+			objectoutputstream.writeObject(serverlistcache)
+			print execname+':Write ServerListCache('+str(serverlistcache.getCache().size())+') to ('+db2jccoutputdirectory+')'+path+'/jccServerListCache.bin ...'
+		except:
+			print execname+':Write ServerListCache failed ...'
+			sys.exit(1)

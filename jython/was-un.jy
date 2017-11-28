@@ -1,0 +1,163 @@
+#IBM WebSphere Application ServerTM, Release 8.5 API Specification
+#https://www.ibm.com/support/knowledgecenter/en/SSCKBL_8.5.5/com.ibm.websphere.javadoc.doc/web/apidocs/index.html
+#Related tasks
+#Installing an application through programming
+#https://www.ibm.com/support/knowledgecenter/en/SSAW57_8.5.5/com.ibm.websphere.nd.doc/ae/tjmx_install_app.html
+
+from java.io import *
+from java.lang import *
+from java.util import *
+from javax.net import *
+from javax.management import *
+from org.json import *
+from org.apache.commons.codec.binary.Base64 import *
+from com.ibm.websphere.management import *
+from com.ibm.websphere.management.application import *
+from com.ibm.websphere.management.application.client import *
+from com.ibm.websphere.management.configservice import *
+from com.ibm.websphere.management.filetransfer.client import *
+from com.ibm.ws.management.fileservice import *
+
+import sys,time,thread
+
+exec_name=File(sys.argv[0]).getName()
+
+#Specify the Java Management Extensions (JMX) notification listener for JMX events.
+class addnotificationlistener(NotificationListener):
+	def __init__(self,client,filter,handback,eventtype):
+		self.client=client
+		self.eventtype=eventtype
+		self.objectname=ObjectName(str(client.queryNames(ObjectName("WebSphere:*,type=AppManagement"),None).toArray()[0]))
+		self.printwriter=PrintWriter(BufferedWriter(FileWriter(self.eventtype+'_'+self.client.getConnectorProperties()["host"]+'.log', 1)))
+		client.addNotificationListener(self.objectname,self,filter,handback)
+#	def removenotificationlistener(self):
+#		self.client.removeNotificationListener(self.objectname,self)
+	def handleNotification(self,notification,handback):
+		userdata=notification.getUserData()
+#		print userdata.message
+		self.printwriter.println(userdata.message)
+		if userdata.taskStatus in [AppNotification.STATUS_COMPLETED,AppNotification.STATUS_FAILED]:
+			try:
+#				print exec_name+':remove notificationlistener...'
+				self.client.removeNotificationListener(self.objectname,self)
+				self.taskstatus=userdata.taskStatus
+				self.printwriter.close()
+			except:
+				print exec_name+':remove notificationlistener failed...'
+#upload earfile
+def uploadFile(earfile,adminclient):
+	filetransferclient=FileTransferFactory.getFileTransferClient(adminclient)
+	serverstaginglocation=filetransferclient.getServerStagingLocation()
+	earfileuploaded=time.strftime("%Y%m%d%H%M%S")+File(earfile).getName()
+	filetransferclient.uploadFile(File(earfile),earfileuploaded)
+	return serverstaginglocation+earfileuploaded
+
+#create AdminClient
+def createAdminClient(host):
+	createadminclientproperty=Properties()
+	createadminclientproperty.setProperty(AdminClient.CONNECTOR_AUTO_ACCEPT_SIGNER, "true")
+	createadminclientproperty.setProperty(AdminClient.CONNECTOR_HOST, host)
+	createadminclientproperty.setProperty(AdminClient.CONNECTOR_PORT, "8880")
+	createadminclientproperty.setProperty(AdminClient.CONNECTOR_SECURITY_ENABLED, "true")
+	createadminclientproperty.setProperty(AdminClient.CONNECTOR_SOAP_CONFIG, "/opt/IBM/WebSphere/Profiles/mypf/etc/soap.client.props")
+	createadminclientproperty.setProperty(AdminClient.CONNECTOR_TYPE, AdminClient.CONNECTOR_TYPE_SOAP)
+	createadminclientproperty.setProperty(AdminClient.PASSWORD, *)
+	createadminclientproperty.setProperty(AdminClient.USERNAME, *)
+	createadminclientproperty.setProperty("javax.net.ssl.keyStore", "/opt/IBM/WebSphere/Profiles/*/etc/DummyClientKeyFile.jks")
+	createadminclientproperty.setProperty("javax.net.ssl.keyStorePassword", "WebAS")
+	createadminclientproperty.setProperty("javax.net.ssl.trustStore", "/opt/IBM/WebSphere/Profiles/*/etc/DummyClientTrustFile.jks")
+	createadminclientproperty.setProperty("javax.net.ssl.trustStorePassword", "WebAS")
+	try:
+		adminclient=AdminClientFactory.createAdminClient(createadminclientproperty)
+		return adminclient
+	except:
+		print exec_name+':create adminclient to host "'+host+'" failed...'	
+
+def installApplication(adminclient,earfile,appname,ctxroot):
+	appmanagementproxy=AppManagementProxy.getJMXProxyForClient(adminclient)
+	configserviceproxy=ConfigServiceProxy(adminclient)
+	earfilename=File(earfile).getName()
+
+	servermbean=adminclient.getServerMBean()
+	module_to_server=Hashtable()
+	module_to_server.put("*",'WebSphere:cell='+servermbean.getKeyProperty('cell')+',node='+servermbean.getKeyProperty('node')+',server='+servermbean.getKeyProperty('process'))
+	appdeploymentoptions=Hashtable()
+	appdeploymentoptions.put(AppConstants.APPDEPL_MODULE_TO_SERVER, module_to_server)
+
+	session=Session()
+	appmanagementproxy.listApplications(Hashtable(),session.toString())
+
+	uninstallapplication=[]
+
+	if appname!=None and appmanagementproxy.checkIfAppExists(appname,Hashtable(),session.toString()):
+#		print exec_name+':using appname(?):'+appname+'...'
+		uninstallapplication=uninstallapplication+[appname]
+	if ctxroot!=None:
+		for i in appmanagementproxy.listApplications(Hashtable(),session.toString()):
+			task=AppManagementFactory.readTasks(appmanagementproxy.getApplicationInfo(i,Hashtable(),session.toString()),None,None).getTaskByName('CtxRootForWebMod')
+			if not task.isTaskEmpty() and ctxroot==task.getTaskData()[1][2] and i not in uninstallapplication:
+				if appname==None:
+					appname=i
+#					print exec_name+':using appname(installedApp):'+appname+'...'
+					if appname not in uninstallapplication and appmanagementproxy.checkIfAppExists(appname,Hashtable(),session.toString()):
+						uninstallapplication=uninstallapplication+[i]
+	if appname==None:
+		appname=earfilename[0:earfilename.rfind('.')]
+#		print exec_name+':using appname(Filename):'+appname+'...'
+		if appname not in uninstallapplication and appmanagementproxy.checkIfAppExists(appname,Hashtable(),session.toString()):
+			uninstallapplication=uninstallapplication+[appname]
+
+	for app in uninstallapplication:
+		notificationlistener=addnotificationlistener(adminclient,None,None,appname)
+#		print exec_name+':uninstall '+app+'...'
+		appmanagementproxy.uninstallApplication(app,Hashtable(),session.toString())
+		while(not hasattr(notificationlistener,'taskstatus')):
+			time.sleep(3)
+#		print exec_name+':task finished with status '+notificationlistener.taskstatus+'...'
+	if not locals().has_key('notificationlistener') or notificationlistener.taskstatus!='Failed':
+		earfileuploaded=uploadFile(earfile,adminclient)
+		notificationlistener=addnotificationlistener(adminclient,None,None,appname)
+		print exec_name+':installation on '+adminclient.getConnectorProperties()["host"]+'(appname:'+appname+') started...'
+		appmanagementproxy.installApplication(earfileuploaded,appname,appdeploymentoptions,session.toString())
+		while(not hasattr(notificationlistener,'taskstatus')):
+			time.sleep(3)
+#		print exec_name+':task finished with status '+notificationlistener.taskstatus+'...'
+	if notificationlistener.taskstatus!='Failed':
+#		print exec_name+':save the changes...'
+		configserviceproxy.save(session,0)
+		if adminclient.invoke(adminclient.queryNames(ObjectName('WebSphere:name='+appname+',type=J2EEApplication,*'),None).toArray()[0],'getJ2EEState',None,None)!=1:
+			try:
+#				print exec_name+':starting '+appname+'...'
+				appmanagementproxy.startApplication(appname,Hashtable(),None)
+			except:
+				print exec_name+':start '+appname+' failed...'
+				return 0
+#		print exec_name+':'+appname+' started...'
+		return 1
+	else:
+		print exec_name+':discard changes...'
+		configserviceproxy.discard(session)
+		return 0
+
+def deployear(earfile):
+	earfilename=File(earfile).getName()
+	try:
+		appdeploymentcontroller=AppDeploymentController.readArchive(earfile,Hashtable())
+	except:
+		print exec_name+':read ear file failed...'
+		return
+
+	task=appdeploymentcontroller.getTaskByName('CtxRootForWebMod')
+	if not task.isTaskEmpty():
+		ctxroot=task.getTaskData()[1][2]
+	else:
+		ctxroot=None
+		print exec_name+':no ctxroot defined in ear file:'+earfile+'...'
+#		return
+
+	if ctxroot!=None:
+			installApplication(createAdminClient(server),earfile,None,ctxroot)
+	else:
+			installApplication(createAdminClient(server),earfile,None,None)
+
+	print exec_name+':installation of '+earfilename+' finished...'
