@@ -11,7 +11,8 @@ lua/redisinfo.lua
 get redis/sentinel info,work on openresty(ngx-lua)
 
 lua/metrics.lua  
-for prometheus metrics,work on openresty(ngx-lua)
+for prometheus metrics,work on openresty(ngx-lua)  
+https://github.com/knyar/nginx-lua-prometheus
 
 vbs/multic.vbs  
 login in multiple terminals,work on SecureCRT
