@@ -15,3 +15,7 @@ for prometheus metrics,work on openresty(ngx-lua)
 
 vbs/multic.vbs  
 login in multiple terminals,work on SecureCRT
+
+python/dockeregistryfunc.py  
+some functions for docker registry http api  
+https://docs.docker.com/registry/spec/api/
