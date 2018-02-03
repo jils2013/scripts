@@ -1,13 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import json
-import urllib2
-import urllib
-import re
-import base64
-import threading
-import time
+import json,urllib2,urllib,re,base64,threading,time
 
 # Bearer realm...
 user = {'http://youregistry.com/v2/token': ['user', 'password']}
