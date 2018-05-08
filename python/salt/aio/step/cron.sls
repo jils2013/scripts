@@ -1,7 +1,7 @@
 #!py
 #import logging
 '''
-readable config template: 
+readable config should in template/cron/*.json: 
 {
 	"cron": [{
 			"name": "13 0 * * * do.sh",
