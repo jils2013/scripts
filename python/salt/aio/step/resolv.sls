@@ -2,7 +2,7 @@
 import socket
 #import logging
 '''
-readable config template: 
+readable config should in template/resolv/*.json: 
 {
 	"resolv": {
 		"search": ["a.com", "b.a.com", "d.a.com", "c.a.com"],
