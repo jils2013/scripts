@@ -1,0 +1,7 @@
+{
+	"archive": [{
+			"name": "jdk1.7.zip",
+			"path": "/usr/java/jdk1.7"
+		}
+	]
+}
