@@ -1,0 +1,12 @@
+{
+	"archive": [{
+			"name": "tomcat.zip",
+			"path": "/opt/tomcat",
+			"exclude": ["webapp/", "logs/", "bin/"],
+			"recurse": {
+				"user": "tomcat",
+				"group": "tomcat"
+			}
+		}
+	]
+}
