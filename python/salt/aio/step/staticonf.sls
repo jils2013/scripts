@@ -1,7 +1,7 @@
 #!py
 import datetime,os
 '''
-readable config template: 
+readable config should in template/staticonf/*.json: 
 {
 	"staticonf": [{
 			"name": "/opt/nginx/conf/nginx.conf",
