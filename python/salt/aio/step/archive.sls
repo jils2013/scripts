@@ -11,7 +11,7 @@ jdk1.7.zip
 jdk1.7.zip.md5
 jdk1.7.zip.md5.md5
 ...
-readable config template: 
+readable config should in template/archive/*.json: 
 {
 	"archive": [{
 			"name": "tomcat.zip",--filename in path $fileserver
