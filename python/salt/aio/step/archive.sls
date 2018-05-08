@@ -2,7 +2,16 @@
 import datetime,os
 #import logging
 '''
-readable config template 
+archive files should be in aio/archive like follows:
+...
+tomcat.zip
+tomcat.zip.md5
+tomcat.zip.md5.md5
+jdk1.7.zip
+jdk1.7.zip.md5
+jdk1.7.zip.md5.md5
+...
+readable config template: 
 {
 	"archive": [{
 			"name": "tomcat.zip",--filename in path $fileserver
