@@ -2,7 +2,7 @@
 import re
 import logging
 '''
-readable config template: 
+readable config should in template/filesystem/*.json: 
 {
 	"filesystem": {
 		"tctHome": {
