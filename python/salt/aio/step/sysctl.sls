@@ -1,6 +1,6 @@
 #!py
 '''
-readable config template: 
+readable config should in template/sysctl/*.json: 
 {
 	"sysctl": {
 		"kernel.core_uses_pid": 1,
