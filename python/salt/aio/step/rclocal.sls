@@ -1,6 +1,6 @@
 #!py
 '''
-readable config template: 
+readable config should in template/rclocal/*.json: 
 {"rclocal": ["sh /opt/tomcat/bin/start.sh"]}
 '''
 def run():
