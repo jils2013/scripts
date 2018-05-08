@@ -1,7 +1,7 @@
 #!py
 #import logging
 '''
-readable config template: 
+readable config should in template/user/*.json: 
 {
 	"user": {
 		"app1": {
