@@ -1,6 +1,6 @@
 #!py
 '''
-readable config template: 
+readable config should in template/pkg/*.json: 
 {"pkg": ["telnet","vi"]}
 '''
 def run():
