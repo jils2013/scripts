@@ -12,7 +12,11 @@ get redis/sentinel info,work on openresty(ngx-lua)
 
 lua/metrics.lua  
 for prometheus metrics,work on openresty(ngx-lua)  
-https://github.com/knyar/nginx-lua-prometheus
+https://github.com/knyar/nginx-lua-prometheus  
+
+lua/rsa.lua  
+https://github.com/doujiang24/lua-resty-rsa  
+add function:decrypt_with_public_key/encrypt_with_private_key/x509_get_pubkey  
 
 vbs/multic.vbs  
 login in multiple terminals,work on SecureCRT
