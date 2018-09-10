@@ -35,7 +35,7 @@
 #../source/c/t3:${c} ${c} ....
 #../source/c/t3:${b} ${a} ....
 
-#解析json，并声明
+#解析json，并作为环境变量赋值
 eval `jq -r '. | keys[] as $k | "\($k)=\(.[$k])"' c.json`
 
 cd workdir/source/
