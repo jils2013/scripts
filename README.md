@@ -28,9 +28,8 @@ https://docs.docker.com/registry/spec/api/
 python/salt  
 salt-sls scripts in py renderer,initialize the virtual-machine os configuration  
 -- srv/aio/begin.sls:run sls in step directory(wildcard)  
--- srv/aio/step/:sls scripts,py renderer  
 -- srv/aio/step/archive.sls:unzip/tar packages in directory:archive to special path  
--- srv/aio/step/filesystem.sls			#lvcreate,mkfs,mount  
+-- srv/aio/step/filesystem.sls:lvcreate,mkfs,mount  
   ...  
 -- fileserver+/archive/:archive files here  
 -- fileserver+/template/:config template here  
