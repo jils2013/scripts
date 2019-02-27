@@ -32,7 +32,7 @@ salt-sls scripts in py renderer,initialize the virtual-machine os configuration
 -- srv/aio/step/archive.sls:unzip/tar packages in directory:archive to special path  
 -- srv/aio/step/filesystem.sls			#lvcreate,mkfs,mount  
   ...  
--- fileserver+/archive/:archive files,used in step/archive.sls  
+-- fileserver+/archive/:archive files here  
 -- fileserver+/template/:config template here  
    #an template example  
 -- fileserver+/template/archive:loaded by step/archive.sls  
