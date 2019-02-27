@@ -1,6 +1,4 @@
 #!py
-import socket
-#import logging
 '''
 readable config should in template/resolv/*.json: 
 {
