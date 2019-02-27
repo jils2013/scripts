@@ -27,7 +27,7 @@ https://docs.docker.com/registry/spec/api/
 
 python/salt/aio  
 salt-sls scripts in py renderer,initialize the virtual-machine os configuration  
--- begin.sls:run sls in step directory(wildcard)  
+-- srv/aio/begin.sls:run sls in step directory(wildcard)  
 -- srv/aio/step/:sls scripts,py renderer  
 -- srv/aio/step/archive.sls:unzip/tar packages in directory:archive to special path  
 -- srv/aio/step/filesystem.sls			#lvcreate,mkfs,mount  
@@ -36,7 +36,7 @@ salt-sls scripts in py renderer,initialize the virtual-machine os configuration
 -- fileserver+/template/:config template here  
 -- fileserver+/template/source:special one,for salt.state.file source  
    #an template example  
--- fileserver+/template/archive:loaded by step/archive.sls,The directory name is the same as the sls-script(in directory:step) name  
+-- fileserver+/template/archive:loaded by step/archive.sls
 -- fileserver+/template/archive/base.json:default  
 -- fileserver+/template/archive/tomcat.json:for label:\*,tocmat  
 
