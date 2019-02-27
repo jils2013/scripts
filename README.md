@@ -35,8 +35,8 @@ salt-sls scripts in py renderer,initialize the virtual-machine os configuration
 -- fileserver+/archive/:archive files here  
 -- fileserver+/template/:config template here  
    #an template example  
--- fileserver+/template/archive:loaded by step/archive.sls  
--- fileserver+/template/archive/base.json:default  
--- fileserver+/template/archive/tomcat.json:for label:\*,tocmat  
+-- fileserver+/template/pkg:loaded by srv/aio/step/pkg.sls  
+-- fileserver+/template/pkg/base.json:default  
+-- fileserver+/template/pkg/tomcat.json:for label:\*,tocmat  
 
     
