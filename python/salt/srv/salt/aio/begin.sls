@@ -1,4 +1,7 @@
 #!py
+'''
+salt tgt state.apply aio.begin pillar='{"lables":"tomcat"}' test=true
+'''
 import os
 
 def run():
