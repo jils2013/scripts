@@ -3,8 +3,11 @@
 readable config should in template/rclocal/*.json: 
 {"rclocal": ["sh /opt/tomcat/bin/start.sh"]}
 '''
+import os
+
 def run():
-	expect=salt.slsutil.renderer(path=salt.cp.cache_file('salt://aio/scripts/expect.py'),default_renderer='py',labels=pillar.get('labels',''),slsname=__name__,retemplate=[])
+	globals().update(__pillar__)
+	expect=__salt__['aio.expect'](__name__,labels,fileserver)
 	ret={}
 	for i in expect:
 		ret['append:{%s}'%i]={'file.append':[{'name':'/etc/rc.d/rc.local','text':i}]}
