@@ -27,6 +27,7 @@ https://docs.docker.com/registry/spec/api/
 
 python/salt  
 salt-sls scripts in py renderer,initialize the virtual-machine os configuration  
+-- etc/salt/roster:an example roster in py renderer  
 -- srv/aio/begin.sls:run sls in step directory(wildcard)  
 -- srv/aio/step/archive.sls:unzip/tar packages in directory:archive to special path  
 -- srv/aio/step/filesystem.sls:lvcreate,mkfs,mount  
