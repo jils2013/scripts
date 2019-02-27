@@ -1,5 +1,4 @@
 #!py
-#import logging
 '''
 readable config should in template/cron/*.json: 
 {
@@ -11,12 +10,15 @@ readable config should in template/cron/*.json:
 }
 
 '''
+import logging,os
+
 def run():
-	#log=logging.getLogger(__name__)
-	expect=salt.slsutil.renderer(path=salt.cp.cache_file('salt://aio/scripts/expect.py'),default_renderer='py',labels=pillar.get('labels',''),slsname=__name__,retemplate=[])
+	log=logging.getLogger(__name__)
+	globals().update(__pillar__)
+	expect=__salt__['aio.expect'](__name__,labels,fileserver)
 	ret={}
 	for i in expect:
-		pres=salt.cron.ls(i['user'])['pre']
+		pres=__salt__['cron.ls'](i['user'])['pre']
 		_id='job:%s#%s'%(i['user'],i['name'])
 		if i['name'] in pres:
 			ret[_id]={'test.succeed_without_changes':[{'name':'Job:{%s} is already in %s\'s crontab'%(i['user'],i['name'])}]}
