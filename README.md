@@ -34,7 +34,6 @@ salt-sls scripts in py renderer,initialize the virtual-machine os configuration
   ...  
 -- fileserver+/archive/:archive files,used in step/archive.sls  
 -- fileserver+/template/:config template here  
--- fileserver+/template/source:special one,for salt.state.file source  
    #an template example  
 -- fileserver+/template/archive:loaded by step/archive.sls  
 -- fileserver+/template/archive/base.json:default  
