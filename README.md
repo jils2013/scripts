@@ -25,7 +25,7 @@ python/dockeregistryfunc.py
 some functions for docker registry http api  
 https://docs.docker.com/registry/spec/api/  
 
-python/salt/aio  
+python/salt  
 salt-sls scripts in py renderer,initialize the virtual-machine os configuration  
 -- srv/aio/begin.sls:run sls in step directory(wildcard)  
 -- srv/aio/step/:sls scripts,py renderer  
