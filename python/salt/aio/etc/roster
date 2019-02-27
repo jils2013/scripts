@@ -1,6 +1,12 @@
 #!py
 '''
-store password in user-define var:argot.
+
+Store password in user-define var:argot.
+
+Add following lines to ~/.ssh/config to disable strict host key checking.
+StrictHostKeyChecking no
+UserKnownHostsFile /dev/null
+
 '''
 import logging
 
