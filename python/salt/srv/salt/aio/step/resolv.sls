@@ -11,21 +11,27 @@ readable config should in template/resolv/*.json:
 }
 
 '''
+import socket,os,logging
+
 def run():
-	#log=logging.getLogger(__name__)
-	expect=salt.slsutil.renderer(path=salt.cp.cache_file('salt://aio/scripts/expect.py'),default_renderer='py',labels=pillar.get('labels',''),slsname=__name__,retemplate={})
+	log=logging.getLogger(__name__)
+	globals().update(__pillar__)
+	expect=__salt__['aio.expect'](__name__,labels,fileserver)
 	ret={}
 
 	if not expect.get('nameservers',''):
 		return {'nonameservers':{'test.fail_without_changes':[{'name':'resolv:nameservers is null.'}]}}
-	ret['etc']={'file.managed':[{'source':'salt://aio/template/source/resolv.py','name':'/etc/resolv.conf','template':'py','backup':'minion','context':{'resolv':expect}}]}
+	ret[grains['id']+':/etc/resolv.conf']={'file.managed':[{'source':fileserver+'/template/source/resolv.conf','name':'/etc/resolv.conf','template':'py','backup':'minion','skip_verify':True,'context':{'resolv':expect}}]}
 	if grains['id']=='localhost':
 		return {'nohostname':{'test.fail_without_changes':[{'name':'hostname not set.'}]}}
-	ret[grains['id']]={'host.only':[{'name':grains['fqdn_ip4'].pop(),'hostnames':hostnames(expect)}]}
+	ipaddr=grains['ip4_interfaces'][__salt__['network.default_route']('inet')[0]['interface']][0]
+	ret[grains['id']+':/etc/hosts']={'host.only':[{'name':ipaddr,'hostnames':hostnames(expect)}]}
+	ret[grains['id']+':/etc/hostname']={'file.managed':[{'source':fileserver+'/template/source/hostname_etc','skip_verify':True,'name':'/etc/hostname','template':'jinja','context':{'host':grains['host']}}]}
+	#log.error((ret))
 	return ret
 
 def hostnames(expectresolv):
-	#log=logging.getLogger(__name__)
+	log=logging.getLogger(__name__)
 	if pillar.has_key('domain'):
 		return [grains['host'],'%s.%s'%(grains['host'],pillar['domain'])]
 	if grains['host']==grains['fqdn'] or not grains['fqdn']:
