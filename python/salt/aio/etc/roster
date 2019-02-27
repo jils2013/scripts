@@ -1,0 +1,11 @@
+#!py
+'''
+store password in user-define var:argot.
+'''
+import logging
+
+def run():
+	log=logging.getLogger(__name__)
+	if __pillar__.get('argot','') and __opts__.get('tgt','')!="*":
+        	return {__opts__['tgt']:{'user':'root','passwd':__pillar__['argot'],'host':__opts__['tgt']}}
+	return {} 
