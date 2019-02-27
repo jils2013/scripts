@@ -1,6 +1,6 @@
 #!py
 '''
-An example roster in py renderer,store password in user-define var:argot here,can be expanded as required
+An example roster in py renderer,store password in user-define var:argot here,can be expanded as required.
 
 Add following lines to ~/.ssh/config to disable strict host key checking.
 StrictHostKeyChecking no
