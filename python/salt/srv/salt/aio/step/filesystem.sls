@@ -1,6 +1,4 @@
 #!py
-import re
-import logging
 '''
 readable config should in template/filesystem/*.json: 
 {
@@ -15,16 +13,21 @@ readable config should in template/filesystem/*.json:
 		}
 }
 '''
+
+import re,os,logging
+
 def run():
 	log=logging.getLogger(__name__)
 	ret={}
-	expect=salt.slsutil.renderer(path=salt.cp.cache_file('salt://aio/scripts/expect.py'),default_renderer='py',labels=pillar.get('labels',''),slsname=__name__,retemplate={})
+	globals().update(__pillar__)
+	expect=__salt__['aio.expect'](__name__,labels,fileserver)
 
-	blkids,mounts,vgs=salt.disk.blkid(),salt.mount.active(),salt.lvm.vgdisplay()
+	blkids,mounts,pvs,vgs=__salt__['disk.blkid'](),__salt__['mount.active'](),__salt__['lvm.pvdisplay'](),__salt__['lvm.vgdisplay']()
 	fstype,lables=mounts['/']['fstype'],[i.get('LABEL','')for i in blkids.values()]
 	#labcmd,lablen={'ext3':'tune2fs','ext4':'tune2fs','xfs':'xfs_admin'},{'ext3':16,'ext4':16,'xfs':12}
 	needkb,reserved,vgname=0,'/data01',''
 	ids={
+	'pvcreate':'pvcreate.reserved','vgcreate':'vgcreate.reserved',
 	'unmount':'unmount.reserved','lvremove':'lvremove.reserved',
 	'lv':'lv:%s#%s','mount':'mount:%s','mkfs':'mkfs:%s',
 	'label':'label:%s','blockdev':'blockdev:%s'
@@ -51,20 +54,71 @@ def run():
 	if not expect:
 		return ret or {'mounted':{'test.succeed_without_changes':[{'name':'filesystem(s) all mounted'}]}}
 
-	#Determine which volume group to use
-	#1, high priority to using volume groups with enough free space
-	#2, no volume group exist to meet the 1 conditions, use the reserved volume group
-	for i in vgs.keys():
-		if int(vgs[i]['Free Physical Extents'])*int(vgs[i]['Physical Extent Size (kB)'])>needkb:
-			vgname=i
+	##Determine which volume group to use
+
+	#1, Add on 2018.08.10,support reserved disk/partition,higher priority than using exist volume group;
+	##1.1, reserved disk with no partitions
+	##2.2, reserved partition
+	for _disk in __salt__['partition.get_block_device']():
+		disk='/dev/'+_disk
+		partitions=__salt__['partition.list'](disk,unit="kB")
+		#log.error((disk,partitions['info']['size'][:-2],needkb))
+
+		#break and use this disk:
+		#1, no partition(s) on this disk
+		#2, not choose a volume group
+		#3, this disk has enough free space
+		#4, no volume group on this disk
+		if (
+		not partitions['partitions'] and not vgname
+		and float(partitions['info']['size'][:-2])>needkb
+		and not pvs.get(disk,{}).get('Volume Group Name','')
+		):
+			device,vgname=disk,'vg0n'+_disk
 			break
+
+		elif partitions['partitions'] and not vgname:
+			for _part,info in partitions['partitions'].items():
+				part='/dev/%s%s'%(_disk,_part)
+
+				#continue next partition:
+				#1, has no enough free space
+				#2, has volume group(s) on this partition
+				#3, has filesystem on this partition(in blkids and not in pvs)
+				#4, is an extended partition
+				#5, has filesystem on this partition(use whole disk,#3 cannot been covered)
+				if (
+				float(info['size'][:-2])<needkb
+				or pvs.get(part,{}).get('Volume Group Name','')
+				or (blkids.has_key(part) and not pvs.has_key(part))
+				or __salt__['partition.get_id'](disk,_part).pop()=='5'
+				or info['type'] 
+				):
+					continue
+				device,vgname=part,'vg0n%s%s'%(_disk,_part)
+				break
+	if vgname:
+		ret.update({
+			ids['pvcreate']:{'lvm.pv_present':[{'name':device}]},
+			ids['vgcreate']:{'lvm.vg_present':[{'name':vgname,'devices':device},{'require':[{'id':ids['pvcreate']}]}]}
+		})
+
+	#can not create volume group from reserved disk/partition,will use exist volume group;
+	#2, high priority to using volume groups with enough free space
+	if not vgname:
+		for i in vgs.keys():
+			if int(vgs[i]['Free Physical Extents'])*int(vgs[i]['Physical Extent Size (kB)'])>needkb:
+				vgname=i
+				break
+
+	#3, no volume group exist to match the 1,2 conditions, use the reserved volume group
 	if not vgname:
 		_erret={'nospace':{'test.fail_without_changes':[{'name':'No volume group available'}]}}
 		if not reserved:
 			return _erret
 		if not mounts.has_key(reserved):
 			return _erret
-		_reserved=salt.lvm.lvdisplay(mounts[reserved]['device'])
+		_reserved=__salt__['lvm.lvdisplay'](mounts[reserved]['device'])
 		if not _reserved:
 			return _erret
 		_lv,_lvinf=_reserved.popitem()
@@ -73,6 +127,7 @@ def run():
 		_unused=_free+int(_lvinf['Logical Volume Size'])
 		if needkb<_unused:
 			vgname=_vgname
+			fstype=mounts[reserved]['fstype']
 			if _free<needkb:
 				ret.update({
 					ids['unmount']:{'mount.unmounted':[{'name':reserved,'device':_lv,'persist':True}]},
@@ -94,6 +149,8 @@ def run():
 		})
 		if ret.has_key(_ids['lvremove']):
 			ret[_ids['lv']]['lvm.lv_present'][0]['require']=[{'id':_ids['lvremove']}]
+		if ret.has_key(_ids['vgcreate']):
+			ret[_ids['lv']]['lvm.lv_present'][0]['require']=[{'id':_ids['vgcreate']}]
 		#lsblk not work on rhel/centos 5;blockdev canot support fs-label 
 		#ret[_ids['blockdev']]={'blockdev.formatted':[{'name':_lvname,'fs_type':fstype},{'require':[{'id':_ids['lv']}]}]}
 		#create label and filesystem together,mount will get expected failure when logical volume has no label(not created by salt)
