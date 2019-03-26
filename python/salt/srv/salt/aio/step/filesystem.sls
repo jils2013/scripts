@@ -37,7 +37,7 @@ def run():
 	#1, input check,duplicate or length > 12.
 	#2, skip mounted filesystem/created lv.
 	#3, calculate the space needed(kb).
-	_labels=[]
+	_labels,_mounted=[],''
 	for _label,_attrs in expect.items():
 		_path,_size=_attrs['path'],_attrs['size']
 		if len(_label)>12 or _label in _labels:
@@ -45,6 +45,7 @@ def run():
 		_labels.append(_label)
 		if mounts.has_key(_path):
 			del expect[_label]
+			_mounted=_path
 			continue
 		if _label in lables:
 			del expect[_label]
@@ -55,61 +56,69 @@ def run():
 		return ret or {'mounted':{'test.succeed_without_changes':[{'name':'filesystem(s) all mounted'}]}}
 
 	##Determine which volume group to use
+	#0, Use same volume group with mounted filesystem.
+	if _mounted:
+		fstype=mounts[_mounted]['fstype']
+		_lv=__salt__['lvm.lvdisplay'](mounts[_mounted]['device'])
+		if _lv:
+			_vgname=_lv.values()[0]['Volume Group Name']
+			if int(vgs[_vgname]['Free Physical Extents'])*int(vgs[_vgname]['Physical Extent Size (kB)'])>needkb:
+				vgname=_vgname
 
-	#1, Add on 2018.08.10,support reserved disk/partition,higher priority than using exist volume group;
-	##1.1, reserved disk with no partitions
-	##2.2, reserved partition
-	for _disk in __salt__['partition.get_block_device']():
-		disk='/dev/'+_disk
-		partitions=__salt__['partition.list'](disk,unit="kB")
-		#log.error((disk,partitions['info']['size'][:-2],needkb))
-
-		#break and use this disk:
-		#1, no partition(s) on this disk
-		#2, not choose a volume group
-		#3, this disk has enough free space
-		#4, no volume group on this disk
-		if (
-		not partitions['partitions'] and not vgname
-		and float(partitions['info']['size'][:-2])>needkb
-		and not pvs.get(disk,{}).get('Volume Group Name','')
-		):
-			device,vgname=disk,'vg0n'+_disk
-			break
-
-		elif partitions['partitions'] and not vgname:
-			for _part,info in partitions['partitions'].items():
-				part='/dev/%s%s'%(_disk,_part)
-
-				#continue next partition:
-				#1, has no enough free space
-				#2, has volume group(s) on this partition
-				#3, has filesystem on this partition(in blkids and not in pvs)
-				#4, is an extended partition
-				#5, has filesystem on this partition(use whole disk,#3 cannot been covered)
-				if (
-				float(info['size'][:-2])<needkb
-				or pvs.get(part,{}).get('Volume Group Name','')
-				or (blkids.has_key(part) and not pvs.has_key(part))
-				or __salt__['partition.get_id'](disk,_part).pop()=='5'
-				or info['type'] 
-				):
-					continue
-				device,vgname=part,'vg0n%s%s'%(_disk,_part)
-				break
-	if vgname:
-		ret.update({
-			ids['pvcreate']:{'lvm.pv_present':[{'name':device}]},
-			ids['vgcreate']:{'lvm.vg_present':[{'name':vgname,'devices':device},{'require':[{'id':ids['pvcreate']}]}]}
-		})
-
-	#can not create volume group from reserved disk/partition,will use exist volume group;
-	#2, high priority to using volume groups with enough free space
+	#1, use volume groups with enough free space
 	if not vgname:
 		for i in vgs.keys():
 			if int(vgs[i]['Free Physical Extents'])*int(vgs[i]['Physical Extent Size (kB)'])>needkb:
 				vgname=i
 				break
+
+	#2, support reserved disk/partition
+	##2.1, reserved disk with no partitions
+	##2.2, reserved partition
+	if not vgname:
+		for _disk in __salt__['partition.get_block_device']():
+			disk='/dev/'+_disk
+			partitions=__salt__['partition.list'](disk,unit="kB")
+			#log.error((disk,partitions['info']['size'][:-2],needkb))
+	
+			#break and use this disk:
+			#1, no partition(s) on this disk
+			#2, not choose a volume group
+			#3, this disk has enough free space
+			#4, no volume group on this disk
+			if (
+			not partitions['partitions'] and not vgname
+			and float(partitions['info']['size'][:-2])>needkb
+			and not pvs.get(disk,{}).get('Volume Group Name','')
+			):
+				device,vgname=disk,'vg0n'+_disk
+				break
+
+			elif partitions['partitions'] and not vgname:
+				for _part,info in partitions['partitions'].items():
+					part='/dev/%s%s'%(_disk,_part)
+	
+					#continue next partition:
+					#1, has no enough free space
+					#2, has volume group(s) on this partition
+					#3, has filesystem on this partition(in blkids and not in pvs)
+					#4, is an extended partition
+					#5, has filesystem on this partition(use whole disk,#3 cannot been covered)
+					if (
+					float(info['size'][:-2])<needkb
+					or pvs.get(part,{}).get('Volume Group Name','')
+					or (blkids.has_key(part) and not pvs.has_key(part))
+					or __salt__['partition.get_id'](disk,_part).pop()=='5'
+					or info['type'] 
+					):
+						continue
+					device,vgname=part,'vg0n%s%s'%(_disk,_part)
+					break
+		if vgname:
+			ret.update({
+				ids['pvcreate']:{'lvm.pv_present':[{'name':device}]},
+				ids['vgcreate']:{'lvm.vg_present':[{'name':vgname,'devices':device},{'require':[{'id':ids['pvcreate']}]}]}
+			})
 
 	#3, no volume group exist to match the 1,2 conditions, use the reserved volume group
 	if not vgname:
@@ -127,7 +136,6 @@ def run():
 		_unused=_free+int(_lvinf['Logical Volume Size'])
 		if needkb<_unused:
 			vgname=_vgname
-			fstype=mounts[reserved]['fstype']
 			if _free<needkb:
 				ret.update({
 					ids['unmount']:{'mount.unmounted':[{'name':reserved,'device':_lv,'persist':True}]},
