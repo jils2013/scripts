@@ -14,10 +14,12 @@ local C = ffi.C
 ffi.cdef[[
 typedef unsigned char DES_cblock;
 typedef unsigned char const_DES_cblock;
-typedef struct DES_key_schedule
-{
-  uint32_t ks[32];
-}DES_key_schedule;
+typedef struct DES_ks {
+    union {
+        DES_cblock cblock;
+        DES_LONG deslong[2];
+    } ks[16];
+} DES_key_schedule;
 int DES_set_key(const_DES_cblock *key, DES_key_schedule *schedule);
 void DES_ecb3_encrypt(const_DES_cblock *input, DES_cblock *output, DES_key_schedule *ks1, DES_key_schedule *ks2, DES_key_schedule *ks3, int enc);
 ]]
