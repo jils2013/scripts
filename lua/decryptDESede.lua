@@ -2,6 +2,7 @@ local ngx_log = ngx.log
 local ngx_ERR = ngx.ERR
 local decode_base64 = ngx.decode_base64
 local gsub = ngx.re.gsub
+local sub = string.sub
 
 local ffi = require "ffi"
 local ffi_new = ffi.new
