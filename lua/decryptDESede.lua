@@ -24,6 +24,7 @@ void DES_ecb3_encrypt(const_DES_cblock *input, DES_cblock *output, DES_key_sched
 
 -- openssl base64 -d <<< $str | openssl enc -des-ede3 -K $key -d
 -- Java DESede encrypt , OpenSSL equivalent
+-- follow: https://stackoverflow.com/questions/9038298/java-desede-encrypt-openssl-equivalent
 
 local function decryptDESede(key, str)
     if not key or not str then return nil end
