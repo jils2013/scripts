@@ -18,6 +18,10 @@ lua/rsa.lua
 https://github.com/doujiang24/lua-resty-rsa  
 add function:decrypt_with_public_key/encrypt_with_private_key/x509_get_pubkey  
 
+lua/decryptDESede.lua  
+follow: https://stackoverflow.com/questions/9038298/java-desede-encrypt-openssl-equivalent  
+use luajit with openssl implementation for Java DESede decrypt  
+
 vbs/multic.vbs  
 login in multiple terminals,work on SecureCRT
 
