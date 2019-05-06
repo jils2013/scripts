@@ -53,6 +53,6 @@ local function decryptDESede(key, str)
         C.DES_ecb3_encrypt(input, output, ks1, ks2, ks3, 0)
         ret = ret .. ffi_str(output, 8)
     end
-    ret = gsub(ret, "\\W*$", "")
+    ret = gsub(ret, "[[:cntrl:]]*$", "")
     return ret
 end
