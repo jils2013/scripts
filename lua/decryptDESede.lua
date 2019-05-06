@@ -12,6 +12,7 @@ local ffi_str = ffi.string
 local C = ffi.C
 
 ffi.cdef[[
+typedef unsigned long DES_LONG;
 typedef unsigned char DES_cblock;
 typedef unsigned char const_DES_cblock;
 typedef struct DES_ks {
