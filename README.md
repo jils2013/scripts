@@ -15,7 +15,7 @@ for prometheus metrics,work on openresty(ngx-lua)
 https://github.com/knyar/nginx-lua-prometheus  
 
 lua/rsa.lua  
-https://github.com/doujiang24/lua-resty-rsa  
+follow: https://github.com/doujiang24/lua-resty-rsa  
 add function:decrypt_with_public_key/encrypt_with_private_key/x509_get_pubkey  
 
 lua/decryptDESede.lua  
