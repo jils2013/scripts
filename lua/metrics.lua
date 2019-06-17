@@ -23,8 +23,6 @@ local metrics = {
   {"http_request_alert_40x_route", {"key"}, "Number of HTTP requests on each route with http code 400/404", "counter"},
   {"http_request_alert_50x_route", {"key"}, "Number of HTTP requests on each route with http code 500/502/504", "counter"},
   {"lua_memory_total_worker", {"worker"}, "Memory size used by Lua on each worker(in mbytes)", "gauge"},
-  {"router_redis_info", {"field"}, "Information and statistics about the redis server,from the INFO command", "gauge"},
-  {"router_sentinel_info", {"field"}, "Information and statistics about the sentinel server,from the INFO command(master_host)", "gauge"},
 }
 local setrunner = {
   counter = function(name, desc, labels) return prometheus:counter(name, desc, labels) end,
@@ -95,28 +93,7 @@ end
 
 --redisinfo from lua/router_redisinfo.lua
 function _M.collect(redisinfo)
-  for n = 1,2 do
-    local r={"router_redis_info","router_sentinel_info"}
-    if type(redisinfo[n]) == "string" then
-      metric_ctx[metric_ctx_idx[r[n]]]["runner"]:set("DOWN",{"redis_mode"})
-    else
-      for k,v in pairs(redisinfo[n]) do
-        metric_ctx[metric_ctx_idx[r[n]]]["runner"]:set(v,{k})
-      end
-    end
-  end
   return prometheus:collect()
-end
-
-function _M.collect_req_total_route(key, clear)
-  local count
-  local metric = metric_ctx[metric_ctx_idx["http_request_total_route"]]
-  if metric then
-    count = prometheus.dict:get("http_request_total_route{key=\""..key.."\"}")
-  end
-
-  count = count or 0
-  return count
 end
 
 return _M
