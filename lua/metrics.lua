@@ -91,7 +91,6 @@ function _M.run(ctx)
   end
 end
 
---redisinfo from lua/router_redisinfo.lua
 function _M.collect(redisinfo)
   return prometheus:collect()
 end
